@@ -91,3 +91,18 @@ https://data.cdc.gov/d/fu4u-a9bh
 This analysis uses county-level prevalence estimates rather than individual patient records. Factors such as socioeconomic conditions, healthcare access, and physical activity may affect the observed relationship.
 
 The results describe statistical associations and should not be interpreted as evidence of causation.
+
+## Published Healthcare Analysis Report
+
+The completed healthcare analysis is published using GitHub Pages.
+
+**[View the Interactive Healthcare Analysis Report](https://knguyen7676.github.io/us-county-obesity-diabetes-analysis/OD_Markdown.html)**
+
+The report includes:
+
+- Data preparation and descriptive statistics.
+- Scatterplots and correlation analysis.
+- Linear regression and R-squared values.
+- A histogram of diabetes prevalence.
+- A Wilcoxon rank-sum test comparing counties with lower and higher obesity prevalence.
+- Interpretation of findings and conclusions.
