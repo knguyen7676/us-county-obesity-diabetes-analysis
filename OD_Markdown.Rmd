@@ -1,0 +1,430 @@
+---
+title: 'Healthcare Data Analysis: Obesity and Diabetes Across U.S Counties'
+author: "Katie Nguyen"
+date: "2026-09-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+## Research Question
+
+Is there a statistically significant relationship between obesity prevalence and diabetes prevalence across U.S. counties?
+
+## Dataset Description
+
+This project uses the CDC PLACES: Local Data for Better Health, County Data (2024 Release).
+
+Dataset source: https://data.cdc.gov/d/fu4u-a9bh
+
+The dataset contains numerical and categorical information about public health conditions across U.S. counties.
+
+This analysis focuses on age-adjusted obesity and diagnosed diabetes prevalence estimates from 2022.
+
+The goal is to investigate the relationship between these two health conditions using data visualization, descriptive statistics, correlation analysis, and statistical hypothesis testing.
+
+# Data Loading and Preparation
+
+```{r load-data}
+# Load the CDC PLACES dataset
+CDC_data <- read.csv("CDC_dataset.csv")
+
+# Display the first six rows
+head(CDC_data)
+
+# Check dataset dimensions
+dim(CDC_data)
+```
+
+
+## Filtering and Preparing the Data
+
+For this analysis, I selected age-adjusted obesity and diagnosed diabetes prevalence estimates from 2022. Age-adjusted estimates help account for differences in age distributions across counties.
+
+I matched obesity and diabetes measurements using county location identifiers so that each observation contains both health measurements.
+
+```{r prepare-data}
+# Filter for obesity and diabetes
+health_data <- subset(
+  CDC_data,
+  MeasureId %in% c("OBESITY", "DIABETES") &
+    Data_Value_Type == "Age-adjusted prevalence" &
+    Year == 2022
+)
+
+# Separate obesity data
+obesity_data <- subset(
+  health_data,
+  MeasureId == "OBESITY",
+  select = c(LocationID, Data_Value)
+)
+names(obesity_data)[2] <- "Obesity"
+
+# Separate diabetes data
+diabetes_data <- subset(
+  health_data,
+  MeasureId == "DIABETES",
+  select = c(LocationID, Data_Value)
+)
+names(diabetes_data)[2] <- "Diabetes"
+
+# Match the data by county
+county_data <- merge(
+  obesity_data,
+  diabetes_data,
+  by = "LocationID"
+)
+
+# Remove any incomplete records
+county_data <- na.omit(county_data)
+
+# Display a preview and row count
+head(county_data)
+nrow(county_data)
+```
+
+The resulting dataset contains one row for each matched geographic location, with numerical values for obesity and diabetes prevalence.
+
+
+# 1. Data Visualization: Obesity vs. Diabetes
+
+To visualize the relationship between obesity and diabetes prevalence, I created a scatterplot using the age-adjusted prevalence percentages from 3,145 matched geographic observations.
+
+Each point represents one county-level observation. Obesity prevalence is shown on the horizontal axis, while diabetes prevalence is shown on the vertical axis.
+
+```{r obesity-diabetes-plot}
+plot(
+  county_data$Obesity,
+  county_data$Diabetes,
+  main = "Obesity vs. Diabetes Prevalence (2022)",
+  xlab = "Age-Adjusted Obesity Prevalence (%)",
+  ylab = "Age-Adjusted Diabetes Prevalence (%)",
+  col = "steelblue",
+  pch = 16,
+  cex = 0.6
+)
+```
+
+## Interpretation
+
+The scatterplot shows a positive relationship between obesity and diabetes prevalence across U.S. counties. Counties with higher obesity prevalence generally have higher diabetes prevalence.
+
+Although there is variation between counties, the overall upward pattern suggests that obesity prevalence may be a useful predictor of diabetes prevalence.
+
+However, the graph demonstrates an association rather than a causal relationship.
+
+
+
+# 2. Descriptive Statistics
+
+To better understand obesity and diabetes prevalence across U.S. counties, I calculated the mean, median, and standard deviation for both variables.
+
+The mean represents the average prevalence across the geographic observations, the median represents the middle value, and the standard deviation measures how much prevalence varies between observations.
+
+```{r descriptive-statistics}
+# Calculate descriptive statistics
+statistics <- data.frame(
+  Measure = c("Obesity", "Diabetes"),
+  Mean = c(
+    mean(county_data$Obesity),
+    mean(county_data$Diabetes)
+  ),
+  Median = c(
+    median(county_data$Obesity),
+    median(county_data$Diabetes)
+  ),
+  Standard_Deviation = c(
+    sd(county_data$Obesity),
+    sd(county_data$Diabetes)
+  )
+)
+
+# Round numerical results
+statistics[, 2:4] <- round(statistics[, 2:4], 2)
+
+# Display results in a formatted table
+knitr::kable(
+  statistics,
+  caption = "Descriptive Statistics for Obesity and Diabetes Prevalence (%)"
+)
+```
+
+## Interpretation of Descriptive Statistics
+
+The descriptive statistics summarize the typical prevalence of obesity and diabetes across the geographic observations in the dataset.
+
+The mean and median help identify the central tendency of each health condition, while the standard deviation shows how much prevalence varies between counties.
+
+Comparing these statistics provides useful background for investigating the relationship between obesity and diabetes prevalence. However, descriptive statistics alone cannot establish whether the two variables are statistically associated.
+
+The average obesity prevalence across the 3,145 geographic observations was 37.91%, with a median of 38.40% and a standard deviation of 4.65 percentage points. The average diabetes prevalence was 11.13%, with a median of 10.80% and a standard deviation of 2.31 percentage points.
+
+These results indicate that obesity prevalence is generally higher than diagnosed diabetes prevalence across the counties studied. The standard deviations also show that obesity prevalence has greater absolute variation across counties than diabetes prevalence. These findings provide a foundation for investigating whether counties with higher obesity prevalence also tend to have higher diabetes prevalence.
+
+
+# 3. Correlation and Linear Regression Analysis
+
+To determine whether obesity and diabetes prevalence are statistically related, I performed a Pearson correlation test and simple linear regression.
+
+The independent variable is age-adjusted obesity prevalence, and the dependent variable is age-adjusted diabetes prevalence.
+
+The null hypothesis is that there is no linear association between obesity and diabetes prevalence across counties.
+
+```{r correlation-regression}
+# Pearson correlation test
+correlation_test <- cor.test(
+  county_data$Obesity,
+  county_data$Diabetes,
+  method = "pearson"
+)
+
+# Display correlation results
+correlation_test
+
+# Fit linear regression model
+linear_model <- lm(
+  Diabetes ~ Obesity,
+  data = county_data
+)
+
+# Display regression results
+summary(linear_model)
+
+# Extract important statistics
+correlation <- unname(correlation_test$estimate)
+r_squared <- summary(linear_model)$r.squared
+p_value <- correlation_test$p.value
+
+# Display formatted statistics
+cat("Pearson correlation (r):", round(correlation, 4), "\n")
+cat("R-squared:", round(r_squared, 4), "\n")
+cat("P-value:", format.pval(p_value), "\n")
+```
+
+## Scatterplot with Regression Line
+
+The following scatterplot displays the relationship between obesity and diabetes prevalence. The red regression line represents the predicted linear relationship between the two variables.
+
+```{r regression-scatterplot}
+plot(
+  county_data$Obesity,
+  county_data$Diabetes,
+  main = "Obesity and Diabetes Prevalence with Regression Line (2022)",
+  xlab = "Age-Adjusted Obesity Prevalence (%)",
+  ylab = "Age-Adjusted Diabetes Prevalence (%)",
+  col = "steelblue",
+  pch = 16,
+  cex = 0.6
+)
+
+# Add fitted regression line
+abline(
+  linear_model,
+  col = "red",
+  lwd = 3
+)
+
+# Add legend
+legend(
+  "topleft",
+  legend = c("County Observations", "Linear Regression"),
+  col = c("steelblue", "red"),
+  pch = c(16, NA),
+  lty = c(NA, 1),
+  lwd = c(NA, 3),
+  bty = "n"
+)
+```
+
+## Interpretation of Correlation and Regression
+
+The Pearson correlation coefficient was **r = 0.7009**, indicating a strong positive linear relationship between obesity and diabetes prevalence across U.S. counties.
+
+The linear regression produced an **R-squared value of 0.4913**, meaning approximately 49.13% of the variation in county-level diabetes prevalence is explained by obesity prevalence in this model.
+
+The regression coefficient was **0.3480**, indicating that a 1-percentage-point increase in obesity prevalence is associated with an average increase of approximately 0.348 percentage points in diabetes prevalence.
+
+The relationship was statistically significant (**p < 0.001**), providing evidence against the null hypothesis of no linear association.
+
+The scatterplot and regression line support these findings, showing that counties with higher obesity prevalence generally have higher diabetes prevalence. However, these results do not establish that obesity causes diabetes, because other factors may influence both health conditions.
+
+
+# 4. Histogram: Distribution of Diabetes Prevalence
+
+To examine the distribution of diabetes prevalence across U.S. counties, I created a histogram using age-adjusted diabetes prevalence percentages from 2022.
+
+The histogram displays how frequently different diabetes prevalence percentages occur across the 3,145 geographic observations.
+
+```{r diabetes-histogram}
+hist(
+  county_data$Diabetes,
+  breaks = 30,
+  main = "Distribution of Diabetes Prevalence Across U.S. Counties (2022)",
+  xlab = "Age-Adjusted Diabetes Prevalence (%)",
+  ylab = "Number of Counties",
+  col = "steelblue",
+  border = "white"
+)
+
+# Add a line for the mean
+abline(
+  v = mean(county_data$Diabetes),
+  col = "red",
+  lwd = 3
+)
+
+# Add a line for the median
+abline(
+  v = median(county_data$Diabetes),
+  col = "darkgreen",
+  lwd = 3,
+  lty = 2
+)
+
+# Add a legend
+legend(
+  "topright",
+  legend = c("Mean", "Median"),
+  col = c("red", "darkgreen"),
+  lty = c(1, 2),
+  lwd = 3,
+  bty = "n"
+)
+```
+
+## Interpretation of the Histogram
+
+The histogram shows the distribution of age-adjusted diabetes prevalence across U.S. counties.
+
+The mean diabetes prevalence is 11.13%, while the median is 10.80%. Because the mean is slightly higher than the median, the distribution may have some right skew, with a smaller number of counties reporting relatively high diabetes prevalence.
+
+The histogram helps evaluate the shape, spread, and potential outliers in the data. This information is important when choosing an appropriate statistical test for comparing groups.
+
+
+# 5. Statistical Hypothesis Testing: Comparing Two Groups
+
+To investigate whether diabetes prevalence differs between counties with lower and higher obesity prevalence, I divided the dataset into two groups based on the median obesity prevalence.
+
+The median obesity prevalence was 38.4%.
+
+- Lower Obesity: Counties with obesity prevalence at or below 38.4%.
+- Higher Obesity: Counties with obesity prevalence above 38.4%.
+
+The numerical outcome being compared is age-adjusted diabetes prevalence (%).
+
+## Hypotheses
+
+**Null Hypothesis (H0):** The distribution of diabetes prevalence is the same in counties with lower and higher obesity prevalence.
+
+**Alternative Hypothesis (H1):** The distribution of diabetes prevalence differs between counties with lower and higher obesity prevalence.
+
+## Creating the Two Groups
+
+```{r create-obesity-groups}
+# Calculate median obesity prevalence
+obesity_median <- median(county_data$Obesity)
+
+# Create two obesity groups
+county_data$ObesityGroup <- ifelse(
+  county_data$Obesity <= obesity_median,
+  "Lower Obesity",
+  "Higher Obesity"
+)
+
+# Convert to categorical variable
+county_data$ObesityGroup <- factor(
+  county_data$ObesityGroup,
+  levels = c("Lower Obesity", "Higher Obesity")
+)
+
+# Count counties in each group
+table(county_data$ObesityGroup)
+
+# Calculate group statistics
+aggregate(
+  Diabetes ~ ObesityGroup,
+  data = county_data,
+  FUN = function(x) c(
+    Mean = mean(x),
+    Median = median(x),
+    SD = sd(x)
+  )
+)
+```
+
+## Comparing Diabetes Prevalence Between Groups
+
+I created a boxplot to compare the distributions of diabetes prevalence between counties with lower and higher obesity prevalence.
+
+```{r obesity-group-boxplot}
+boxplot(
+  Diabetes ~ ObesityGroup,
+  data = county_data,
+  main = "Diabetes Prevalence by County Obesity Group (2022)",
+  xlab = "County Obesity Group",
+  ylab = "Age-Adjusted Diabetes Prevalence (%)",
+  col = c("lightblue", "steelblue"),
+  border = "gray30"
+)
+```
+
+## Wilcoxon Rank-Sum Test
+
+The diabetes prevalence histogram showed a right-skewed distribution. Therefore, I selected the Wilcoxon rank-sum test to compare the two independent groups without assuming normality.
+
+```{r wilcoxon-test}
+# Perform two-sided Wilcoxon rank-sum test
+wilcox_result <- wilcox.test(
+  Diabetes ~ ObesityGroup,
+  data = county_data,
+  alternative = "two.sided",
+  exact = FALSE
+)
+
+# Display results
+wilcox_result
+
+# Display p-value
+cat(
+  "P-value:",
+  format.pval(wilcox_result$p.value),
+  "\n"
+)
+```
+
+## Interpretation of the Statistical Test
+
+The Wilcoxon rank-sum test was conducted to determine whether diabetes prevalence differs significantly between counties with lower and higher obesity prevalence.
+
+The test produced a **W statistic of 418,272 and a p-value less than 2.2 × 10⁻¹⁶**. Since the p-value is much smaller than the significance level of 0.05, I reject the null hypothesis that the two groups have the same diabetes prevalence distribution.
+
+The boxplot shows that counties with higher obesity prevalence generally have higher diabetes prevalence than counties with lower obesity prevalence. The higher-obesity group also displays greater variability and more extreme high values.
+
+These findings support my research hypothesis that obesity and diabetes prevalence are positively associated across U.S. counties. However, because the data is observational and aggregated at the county level, the results do not establish a causal relationship between obesity and diabetes.
+
+# Conclusion
+
+This project investigated the relationship between obesity and diagnosed diabetes prevalence across 3,145 geographic observations using the CDC PLACES dataset. The analysis focused on age-adjusted prevalence estimates from 2022.
+
+The descriptive statistics showed an average obesity prevalence of 37.91% and an average diabetes prevalence of 11.13%.
+
+The Pearson correlation coefficient of 0.7009 indicated a strong positive linear relationship between obesity and diabetes prevalence. The linear regression model produced an R-squared value of 0.4913, indicating that approximately 49.13% of the variation in diabetes prevalence was explained by obesity prevalence.
+
+The histogram revealed a right-skewed distribution of diabetes prevalence. Based on this observation, I used a Wilcoxon rank-sum test to compare counties with lower and higher obesity prevalence.
+
+The Wilcoxon test produced a statistically significant result (W = 418,272, p < 0.001). Counties with higher obesity prevalence generally had higher diabetes prevalence.
+
+Overall, the findings support my hypothesis that obesity and diabetes prevalence are positively associated across U.S. counties.
+
+However, this analysis has limitations. The dataset contains county-level estimates rather than individual patient records, and other factors such as socioeconomic conditions, healthcare access, and physical activity may influence diabetes prevalence. The results demonstrate statistical associations rather than causation.
+
+Future research could investigate additional variables, including income, physical inactivity, and access to healthcare, to better understand geographic differences in chronic disease prevalence.
+
+# Data Source
+Centers for Disease Control and Prevention (CDC). PLACES: Local Data for Better Health, County Data, 2024 Release.
+
+Dataset: https://data.cdc.gov/d/fu4u-a9bh
